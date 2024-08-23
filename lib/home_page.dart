@@ -1,13 +1,19 @@
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dart_openai/dart_openai.dart';
 import 'package:flex_gpt/ai_provider.dart';
+import 'package:flex_gpt/storage.dart';
 import 'package:flex_gpt/style.dart';
+import 'package:flex_gpt/utils.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:gpt_markdown/gpt_markdown.dart';
+import 'package:macos_ui/macos_ui.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -18,14 +24,20 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int id = 0;
-  List<types.Message> _messages = [];
-  final _user = const types.User(
-    id: 'me',
-  );
-   final _assistant = const types.User(
-    id: 'assistant',
-  );
+  final List<types.Message> _messages = [];
+  TextEditingController textController = TextEditingController();
+  final _user = const types.User(id: 'me');
+  final _assistant = const types.User(id: 'assistant');
 
+  @override
+  void initState() {
+   textController.addListener((){
+    setState(() {
+      
+    });
+   });
+    super.initState();
+  }
    void _addMessage(types.Message message) {
     setState(() {
       _messages.insert(0, message);
@@ -78,49 +90,176 @@ class _HomePageState extends State<HomePage> {
             },
           );
   }
-  @override
   
+
+  void showDialog() async {
+    TextEditingController controller = TextEditingController();
+    String? key = await Storage.getApiKey();
+    showMacosAlertDialog(
+  context: context,
+  builder: (_) => MacosAlertDialog(
+    appIcon: Image.asset('assets/icon/icon.png'),
+    title: Text(
+      'Modifica API Key',
+      style: MacosTheme.of(context).typography.headline,
+    ),
+    message: Column(
+      children: [
+        Text(
+          'API KEY attualmente in uso: *****${key!.substring(key.length-6)}',
+          textAlign: TextAlign.center,
+          style: MacosTypography.of(context).headline,
+        ),
+        const SizedBox(
+          height: 12,
+        ),
+        MacosTextField(
+          placeholder: 'Inserisci la tua API Key',
+          controller: controller,
+        )
+      ],
+    ),
+
+    primaryButton: PushButton(
+      controlSize: ControlSize.large,
+      child: const Text('Salva API Key'),
+      onPressed: () {
+       Storage.saveApiKey(controller.text);
+        Navigator.pop(context);
+      },
+    ),
+     secondaryButton: PushButton(
+      secondary: true,
+      controlSize: ControlSize.large,
+      child: const Text('Chiudi'),
+      onPressed: () {
+        Navigator.pop(context);
+      },
+    ),
+  ),
+);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:AppStyle.secondaryColor.withOpacity(0.6),
-      body: Chat(
-        
-        user: _user,
-        bubbleBuilder: (child, {required message, required nextMessageInGroup}) {
-          return Container(
-            padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color:  message.author.id == "me"? AppStyle.secondaryColor.withOpacity(0.1):
-                AppStyle.secondaryColor.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            child: child,
+      backgroundColor: AppStyle.gray,
+      body: Column(
+        children: [
           
-          );
-        },
-        textMessageBuilder: (p0, {required messageWidth, required showName}) {
-          return TexMarkdown(
-            p0.text, 
-            followLinkColor: true,
-            style: TextStyle(
-              color: 
-              Colors.white,
-              fontSize: 16,
-              fontFamily: 'Poppins'
+           Align(
+            alignment: Alignment.topRight,
+            child: Row(
+              children: [
+                Padding(
+                  padding:  const EdgeInsets.all(8.0),
+                  child: PushButton(
+                    onPressed: () {
+                      exit(0);
+                    },
+                    child:const  Text(
+                    "Chiudi",
+                  ), controlSize:ControlSize.large)
+                ),
+              
+                 Expanded(
+                  child:Container()
+                  ),
+                    Padding(
+                  padding:  const EdgeInsets.all(8.0),
+                  child: PushButton(
+                    secondary: true,
+                    onPressed: () {
+                     Utils.goToUrl("https://chatgpt.com");
+                    },
+                    child:const  Text(
+                    "Apri chatGPT",
+                  ), controlSize:ControlSize.large)
+                ), 
+                   Padding(
+                    
+                  padding:  const EdgeInsets.all(8.0),
+                  child: PushButton(
+                    secondary: true,
+                    onPressed: () {
+                     showDialog();
+                    },
+                    child:const  Text(
+                    "Modifica API Key",
+                  ), controlSize:ControlSize.large)
+                ),
+
+              ],
             ),
-           
-          );
-
-
-
-        },
-        theme: DarkChatTheme(
-          inputTextStyle: TextStyle(
-            fontFamily: 'Poppins'
-          )
-        ),
-        onSendPressed: _handleSendPressed,
-        messages: _messages),
+          ),
+          Expanded(
+            child: Chat(
+              user: _user,
+              customBottomWidget: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                child: MacosTextField(
+                  textInputAction: TextInputAction.send,
+                  maxLines: null,
+                  suffix: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: MacosIcon(
+                      CupertinoIcons.paperplane,
+                     color: textController.text.isEmpty? Colors.grey: AppStyle.blue,
+                      size: 24,
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  controller: textController,
+                  placeholder: "Scrivi un messaggio...",
+                  onSubmitted: (value) {
+                    _handleSendPressed(types.PartialText(text: value));
+                    textController.clear();
+                  },
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Poppins'
+                  ),
+                  decoration: const BoxDecoration(
+                    color: AppStyle.secondaryColor,
+                    borderRadius: BorderRadius.all(Radius.circular(8))
+                  ),
+                ),
+              ),
+              bubbleBuilder: (child, {required message, required nextMessageInGroup}) {
+                return Container(
+                  padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color:  message.author.id == "me"? AppStyle.blue:
+                      AppStyle.ligthGray,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  child: child,
+                
+                );
+              },
+              textMessageBuilder: (p0, {required messageWidth, required showName}) {
+                return TexMarkdown(
+                  p0.text, 
+                  followLinkColor: true,
+                  style: const TextStyle(
+                    color: 
+                    Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'Poppins'
+                  ),
+                );  
+              },
+              theme: const DarkChatTheme(
+                backgroundColor: Colors.transparent,
+                inputTextStyle: TextStyle(
+                  fontFamily: 'Poppins'
+                )
+              ),
+              onSendPressed: _handleSendPressed,
+              messages: _messages),
+          ),
+        ],
+      ),
     );
   }
 }
